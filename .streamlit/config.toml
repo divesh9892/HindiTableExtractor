@@ -1,2 +1,6 @@
 [server]
 maxUploadSize = 5
+
+[runner]
+# Clears the cache when a user session ends to free up RAM
+fastReruns = true
