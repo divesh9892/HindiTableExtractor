@@ -10,10 +10,10 @@ from core.excel_builder import ExcelBuilder
 from core.ai_extractor import AIExtractor
 
 # --- UI Configuration ---
-st.set_page_config(page_title="Hindi Document Extractor", page_icon="📄", layout="wide")
+st.set_page_config(page_title="HindiScan AI", page_icon="📄", layout="wide")
 
-st.title("📄 Enterprise Hindi Document Extractor")
-st.markdown("Convert unstructured government WhatsApp images into perfectly formatted Excel reports.")
+st.title("📄 HindiScan AI")
+st.markdown("Instantly convert Hindi PDFs, scanned documents, and mobile images into perfectly structured Excel spreadsheets. Zero manual data entry required.")
 
 def sanitize_filename(name):
     clean_name = re.sub(r'[\\/*?:"<>|]', "", name)
@@ -186,4 +186,10 @@ with tab2:
 
 # Footer
 st.markdown("---")
-st.caption("Powered by Smart VLM Decoupled Architecture")
+# Using HTML to perfectly center the text and make it look clean
+st.markdown(
+    "<div style='text-align: center; color: gray; font-size: 14px;'>"
+    "Made with ❤️ by Divesh | Powered by Gemini VLM Architecture"
+    "</div>", 
+    unsafe_allow_html=True
+)
