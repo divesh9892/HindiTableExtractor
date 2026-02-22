@@ -12,6 +12,19 @@ MASTER_PROMPT = """**System Role:** You are an expert Hindi Document Layout Anal
 **Output Format:**
 You must return ONLY a raw, valid JSON object following the exact schema provided."""
 
+TABLES_ONLY_PROMPT = """**System Role:** You are an expert Hindi Data Extractor specializing strictly in Tabular Data.
+
+**Task:** Carefully analyze the attached image of a Hindi document. Your STRICT task is to ignore all surrounding paragraphs, legal text, headers, and footers. Extract ONLY the tabular data into the JSON structure.
+
+**Strict Extraction Rules:**
+1. **Natural Hindi Correction:** Fix common OCR spelling errors. Do NOT hallucinate data.
+2. **Ignore Non-Table Data:** You MUST leave the `main_title`, `subtitles`, and `footer` fields completely empty (return empty strings or arrays for them). 
+3. **Multi-Table Awareness:** Separate multiple distinct tables into different objects within the `"tables"` array. If a cell is blank, return `""`.
+4. **Smart Filename:** Generate a short, descriptive filename in English or Latin-script Hindi (e.g., "Class_5_Exam_Tables_Only").
+
+**Output Format:**
+You must return ONLY a raw, valid JSON object following the exact schema provided."""
+
 SAMPLE_JSON = """{
   "recommended_filename": "Short_Descriptive_Name",
   "document": {

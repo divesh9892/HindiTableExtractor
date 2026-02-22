@@ -105,18 +105,19 @@ with tab1:
 # ==========================================
 with tab2:
     st.subheader("Upload Document for Auto-Extraction")
-    st.markdown("Upload a WhatsApp image or PDF (Max 5MB). The AI will read the Hindi text, structure it, and build the Excel file automatically.")
+    st.markdown("Upload a WhatsApp image or PDF (Max 5MB).")
     
     with st.container(border=True):
         use_custom_key = st.toggle("🔑 Use my own Gemini API Key (Bypass App Rate Limits)")
         custom_api_key = None
         if use_custom_key:
             custom_api_key = st.text_input("Enter your Gemini API Key:", type="password")
-            
-            # 🚀 NEW: User Trust Banner
-            st.info("🔒 **Zero-Trust Security:** Your API key is never stored in a database, saved to a file, or logged by the developer. It exists purely in your browser's temporary memory for the exact duration of the extraction and is destroyed when you close the tab.")
+            st.info("🔒 **Zero-Trust Security:** Your API key is never stored. It exists purely in your browser's temporary memory.")
 
-    # 🚀 NEW: Added PDF support to the uploader
+    # 🚀 NEW: The Tables-Only Toggle
+    st.markdown("---")
+    extract_tables_only = st.checkbox("📊 **Extract Tables Only** (Ignore paragraphs, headers, and footers)", value=False)
+    
     uploaded_file = st.file_uploader("Upload Document (JPG/PNG/PDF)", type=['jpg', 'jpeg', 'png', 'pdf'])
     
     if st.button("✨ Auto-Extract & Build Excel", type="primary", key="extract_btn"):
@@ -126,7 +127,6 @@ with tab2:
             st.error("❌ You selected 'Use my own key' but didn't enter one.")
         else:
             try:
-                # 🚀 NEW: Trigger our Security & Size check
                 detected_mime_type = validate_security_and_size(uploaded_file)
                 
                 with tempfile.TemporaryDirectory() as temp_dir:
@@ -136,8 +136,8 @@ with tab2:
                     
                     with st.spinner("🤖 AI is analyzing the document... (This takes 5-15 seconds)"):
                         extractor = AIExtractor(api_key=custom_api_key)
-                        # Notice we pass the mime_type now!
-                        extracted_json = extractor.process_document(temp_doc_path, detected_mime_type)
+                        # Pass the new toggle state to the extractor!
+                        extracted_json = extractor.process_document(temp_doc_path, detected_mime_type, extract_tables_only)
                     
                     with st.spinner("📊 Building Smart Excel File..."):
                         if "document" not in extracted_json:
@@ -168,11 +168,21 @@ with tab2:
                             st.json(extracted_json)
 
             except ValueError as ve:
-                # Catches our specific security/size errors without a scary traceback
                 st.error(f"❌ {str(ve)}")
             except Exception as e:
-                log.error(f"Option 2 Failed: {str(e)}\n{traceback.format_exc()}")
-                st.error(f"❌ Error: {str(e)}")
+                error_str = str(e)
+                # 🚀 NEW: Smart Error Interception for Rate Limits
+                if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                    st.error("🛑 **API Rate Limit Exceeded**")
+                    st.warning("""
+                    **The server is currently processing too many requests. How to proceed:**
+                    1. **Toggle 'Use my own Gemini API Key'** above to bypass the app's limits entirely.
+                    2. **Use Option 1 (Paste JSON):** Generate the JSON directly in Google AI Studio and paste it in the first tab.
+                    3. Wait 60 seconds and try clicking extract again.
+                    """)
+                else:
+                    log.error(f"Option 2 Failed: {error_str}\n{traceback.format_exc()}")
+                    st.error(f"❌ An unexpected error occurred: {error_str}")
 
 # Footer
 st.markdown("---")

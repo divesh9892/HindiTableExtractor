@@ -5,7 +5,8 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 from core.logger import log
-from core.config import MASTER_PROMPT, SAMPLE_JSON
+# 1. IMPORT THE NEW PROMPT
+from core.config import MASTER_PROMPT, SAMPLE_JSON, TABLES_ONLY_PROMPT 
 
 load_dotenv()
 
@@ -26,19 +27,20 @@ class AIExtractor:
             return match.group(1).strip()
         return clean_text
 
-    # 🚀 NEW: Handles both PDFs and Images dynamically
-    def process_document(self, file_path, mime_type):
+    # 2. ADD THE BOOLEAN FLAG HERE
+    def process_document(self, file_path, mime_type, extract_tables_only=False):
         log.info(f"Initiating AI extraction for document: {file_path} ({mime_type})")
         try:
-            # Read the file as raw bytes
             with open(file_path, "rb") as f:
                 doc_bytes = f.read()
             
-            # Package it for the Gemini API
             document_part = types.Part.from_bytes(data=doc_bytes, mime_type=mime_type)
-            full_prompt = f"{MASTER_PROMPT}\n\nEXPECTED JSON SCHEMA:\n{SAMPLE_JSON}"
             
-            log.info(f"Sending payload to {self.model_name} via new SDK...")
+            # 3. DYNAMIC PROMPT INJECTION
+            active_prompt = TABLES_ONLY_PROMPT if extract_tables_only else MASTER_PROMPT
+            full_prompt = f"{active_prompt}\n\nEXPECTED JSON SCHEMA:\n{SAMPLE_JSON}"
+            
+            log.info(f"Sending payload to {self.model_name}. Mode: {'Tables Only' if extract_tables_only else 'Full Document'}")
             
             response = self.client.models.generate_content(
                 model=self.model_name,
@@ -57,14 +59,11 @@ class AIExtractor:
                 log.warning("AI missed the 'document' wrapper. Auto-healing...")
                 if "tables" in parsed_data:
                     filename = parsed_data.pop("recommended_filename", "AI_Extracted_Report")
-                    parsed_data = {
-                        "recommended_filename": filename,
-                        "document": parsed_data 
-                    }
+                    parsed_data = {"recommended_filename": filename, "document": parsed_data}
                 else:
                     raise ValueError(f"AI returned unreadable structure. Keys found: {list(parsed_data.keys())}")
-                    
-            log.info("Successfully extracted and parsed JSON from Gemini.")
+                
+            log.info("Successfully extracted and parsed JSON from Gemini.")       
             return parsed_data
 
         except json.JSONDecodeError as e:
@@ -72,4 +71,5 @@ class AIExtractor:
             raise ValueError("The AI returned invalid JSON format. Try again.")
         except Exception as e:
             log.error(f"Gemini API Error: {str(e)}")
-            raise RuntimeError(f"API Communication Error: {str(e)}")
+            # 4. PASS THE EXACT ERROR MESSAGE UP TO THE UI
+            raise RuntimeError(str(e))
