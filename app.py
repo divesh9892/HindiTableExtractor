@@ -108,7 +108,7 @@ with tab2:
     st.markdown("Upload a WhatsApp image or PDF (Max 5MB).")
     
     with st.container(border=True):
-        use_custom_key = st.toggle("🔑 Use my own Gemini API Key (Bypass App Rate Limits)")
+        use_custom_key = st.toggle("🔑 Use your own Gemini API Key (Bypass App Rate Limits)")
         custom_api_key = None
         if use_custom_key:
             custom_api_key = st.text_input("Enter your Gemini API Key:", type="password")
