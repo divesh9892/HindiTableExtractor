@@ -4,11 +4,15 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from openpyxl.utils import get_column_letter
 from core.logger import log
+from core.font_converter import unicode_to_krutidev
 
 class ExcelBuilder:
-    def __init__(self, json_path, output_path="output_report.xlsx"):
+    # 🚀 NEW: Added legacy_font_name parameter
+    def __init__(self, json_path, output_path="output_report.xlsx", use_legacy_font=False, legacy_font_name="Kruti Dev 010"):
         self.json_path = json_path
         self.output_path = output_path
+        self.use_legacy_font = use_legacy_font
+        self.legacy_font_name = legacy_font_name
         self.wb = Workbook()
         self.ws = self.wb.active
         self.ws.title = "Report"
@@ -21,6 +25,19 @@ class ExcelBuilder:
         self.header_fill = PatternFill(start_color="EAEAEA", end_color="EAEAEA", fill_type="solid")
         self.center_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
         self.left_align = Alignment(horizontal='left', vertical='center', wrap_text=True)
+
+    def _get_font(self, size, is_bold):
+        """Returns the correct OpenPyXL font based on the user's legacy setting."""
+        if self.use_legacy_font:
+            # 🚀 NEW: Dynamically applies either DevLys 010 or Kruti Dev 010
+            return Font(name=self.legacy_font_name, size=size + 2, bold=is_bold) 
+        return Font(name="Nirmala UI", size=size, bold=is_bold)
+
+    def _process_text(self, text):
+        """Translates Unicode Hindi to Kruti Dev English keystrokes if the setting is ON."""
+        if self.use_legacy_font and isinstance(text, str):
+            return unicode_to_krutidev(text)
+        return text
 
     def load_data(self):
         if not os.path.exists(self.json_path):
@@ -40,18 +57,16 @@ class ExcelBuilder:
         """Writes titles/footers and dynamically scales the row height for massive paragraphs."""
         if not text:
             return
-        cell = self.ws.cell(row=self.current_row, column=1, value=text)
+        
+        processed_text = self._process_text(text)
+        cell = self.ws.cell(row=self.current_row, column=1, value=processed_text)
         self.ws.merge_cells(start_row=self.current_row, start_column=1, end_row=self.current_row, end_column=max_cols)
         
-        cell.font = Font(name='Nirmala UI', bold=is_bold, size=font_size)
+        cell.font = self._get_font(size=font_size, is_bold=is_bold)
         cell.alignment = alignment
         
-        # 🚀 THE NEW SMART HEIGHT CALCULATOR FOR MERGED FOOTERS/NOTES
-        # Estimate that each column can hold roughly 15 characters safely
         chars_per_line = max(max_cols * 15, 30) 
-        estimated_lines = str(text).count('\n') + (len(str(text)) // chars_per_line) + 1
-        
-        # Scale the height based on the number of lines and the font size
+        estimated_lines = str(processed_text).count('\n') + (len(str(processed_text)) // chars_per_line) + 1
         self.ws.row_dimensions[self.current_row].height = estimated_lines * (font_size * 1.5)
         self.current_row += 1
 
@@ -75,13 +90,11 @@ class ExcelBuilder:
                 
                 cell = self.ws.cell(row=row_idx, column=col_idx)
                 if cell.value:
-                    # Estimate the width needed for the longest single line in this cell
                     lines = str(cell.value).split('\n')
                     longest_line = max([len(line) for line in lines])
                     if longest_line > max_length:
                         max_length = longest_line
             
-            # Constraints: Min width 12, Max 45
             adjusted_width = max(12, min(max_length + 4, 45))
             self.ws.column_dimensions[column_letter].width = adjusted_width
 
@@ -118,8 +131,10 @@ class ExcelBuilder:
 
             headers = table.get("headers", [])
             for col_idx, header in enumerate(headers, start=1):
-                cell = self.ws.cell(row=self.current_row, column=col_idx, value=header.get("column_name", ""))
-                cell.font = Font(name='Nirmala UI', bold=header.get("is_bold", True), size=11)
+                header_text = header.get("column_name", "")
+                cell = self.ws.cell(row=self.current_row, column=col_idx, value=self._process_text(header_text))
+                
+                cell.font = self._get_font(size=11, is_bold=header.get("is_bold", True))
                 cell.alignment = self.center_align
                 cell.border = self.thin_border
                 cell.fill = self.header_fill
@@ -128,12 +143,12 @@ class ExcelBuilder:
             for row_data in table.get("rows", []):
                 max_lines_in_row = 1
                 for col_idx, value in enumerate(row_data, start=1):
-                    cell = self.ws.cell(row=self.current_row, column=col_idx, value=str(value))
-                    cell.font = Font(name='Nirmala UI', size=11)
+                    cell = self.ws.cell(row=self.current_row, column=col_idx, value=self._process_text(str(value)))
+                    
+                    cell.font = self._get_font(size=11, is_bold=False)
                     cell.alignment = self.center_align
                     cell.border = self.thin_border
                     
-                    # More robust row height estimator for table columns
                     lines = str(value).count('\n') + (len(str(value)) // 30) + 1
                     if lines > max_lines_in_row:
                         max_lines_in_row = lines
@@ -144,13 +159,12 @@ class ExcelBuilder:
             self.current_row += 1 
 
         footer = document.get("footer", {})
-        # If AI hallucinates and returns a list (e.g., ["footer text"]), convert to string
         if isinstance(footer, list):
             footer_text = "\n".join([str(i) for i in footer])
             footer = {"text": footer_text, "is_bold": False, "font_size": 11}
-        # If AI hallucinates and returns a pure string, convert to dict
         elif isinstance(footer, str):
             footer = {"text": footer, "is_bold": False, "font_size": 11}
+            
         self.write_merged_text(
             footer.get("text", ""), max_cols, 
             footer.get("is_bold", False), footer.get("font_size", 11), 

@@ -13,16 +13,16 @@ load_dotenv()
 class AIExtractor:
     def __init__(self, api_key=None):
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
-        if not self.api_key:
+        if not self.api_key or not self.api_key.strip():
             log.error("API Key missing.")
-            raise ValueError("No API Key provided. Please enter a valid Gemini API Key.")
+            raise ValueError("No API Key provided. Please enter a valid Gemini API Key.")     
         
         self.client = genai.Client(api_key=self.api_key)
         self.model_name = 'gemini-2.5-flash'
 
     def _clean_json_response(self, raw_text):
         clean_text = raw_text.strip()
-        match = re.search(r'```(?:json)?\s*(.*?)\s*```', clean_text, re.DOTALL)
+        match = re.search(r'```(?:json)?\s*(.*?)\s*```', clean_text, flags=re.DOTALL | re.IGNORECASE)
         if match:
             return match.group(1).strip()
         return clean_text
@@ -57,7 +57,9 @@ class AIExtractor:
             
             if "document" not in parsed_data:
                 log.warning("AI missed the 'document' wrapper. Auto-healing...")
-                if "tables" in parsed_data:
+                # 🚀 FIX 3: Check for ANY valid root key, not just "tables"
+                valid_root_keys = ["tables", "main_title", "subtitles", "footer"]
+                if any(key in parsed_data for key in valid_root_keys):
                     filename = parsed_data.pop("recommended_filename", "AI_Extracted_Report")
                     parsed_data = {"recommended_filename": filename, "document": parsed_data}
                 else:
