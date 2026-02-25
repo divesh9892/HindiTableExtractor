@@ -3,12 +3,19 @@ import pytest
 from unittest.mock import patch, MagicMock
 from core.ai_extractor import AIExtractor
 from core.config import MASTER_PROMPT, TABLES_ONLY_PROMPT
+import fitz
 
-# 🚀 PYTEST FIXTURE: Automatically handles the dummy PDF for any test that needs it
+# 🚀 PYTEST FIXTURE: Automatically handles a REAL dummy PDF for any test that needs it
 @pytest.fixture
 def dummy_pdf(tmp_path):
     doc_path = tmp_path / "dummy.pdf"
-    doc_path.write_bytes(b"%PDF-1.4 dummy content")
+    
+    # Create a real, blank PDF so PyMuPDF doesn't crash during tests
+    doc = fitz.open() 
+    doc.new_page()    
+    doc.save(str(doc_path))
+    doc.close()
+    
     return str(doc_path)
 
 # Test 1: Ensure strict API Key validation handles None, empty strings, and spaces
@@ -50,7 +57,10 @@ def test_successful_api_extraction(mock_client_class, dummy_pdf):
     extractor = AIExtractor(api_key="FAKE_KEY")
     result = extractor.process_document(dummy_pdf, mime_type="application/pdf")
     
-    assert "document" in result
+    # 🚀 FIX: Check for "pages", then verify the first page has the "document"
+    assert "pages" in result
+    assert len(result["pages"]) == 1
+    assert "document" in result["pages"][0]
     assert result["recommended_filename"] == "Test_Doc"
 
 # Test 4: The Auto-Healer (Testing different flattened structures)
@@ -73,9 +83,10 @@ def test_auto_healer(mock_client_class, dummy_pdf, hallucinated_json, expected_k
     extractor = AIExtractor(api_key="FAKE_KEY")
     result = extractor.process_document(dummy_pdf, mime_type="application/pdf")
     
-    # The auto-healer should have caught it and injected the "document" key
-    assert "document" in result
-    assert expected_key_to_wrap in result["document"]
+    # 🚀 FIX: Verify the auto-healer successfully placed "document" inside the new pages array
+    assert "pages" in result
+    assert "document" in result["pages"][0]
+    assert expected_key_to_wrap in result["pages"][0]["document"]
 
 # Test 5: Context Switcher
 @patch('core.ai_extractor.genai.Client')

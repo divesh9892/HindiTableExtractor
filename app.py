@@ -5,7 +5,8 @@ import tempfile
 import traceback
 import re
 from core.logger import log
-from core.config import MASTER_PROMPT, SAMPLE_JSON
+# 🚀 REMOVED MASTER_PROMPT import to protect your trade secret
+from core.config import SAMPLE_JSON
 from core.excel_builder import ExcelBuilder
 from core.ai_extractor import AIExtractor
 
@@ -15,7 +16,7 @@ st.set_page_config(page_title="HindiScan AI", page_icon="📄", layout="wide")
 st.title("📄 HindiScan AI")
 st.markdown("Instantly convert Hindi PDFs, scanned documents, and mobile images into perfectly structured Excel spreadsheets. Zero manual data entry required.")
 
-# 🚀 NEW: Progressive Disclosure Export Settings (Moved from Sidebar)
+# Progressive Disclosure Export Settings
 st.markdown("---")
 st.subheader("⚙️ Export Settings")
 use_legacy_font = st.toggle("🔤 Enable Legacy Government Fonts (Kruti Dev / DevLys)", value=False)
@@ -63,13 +64,16 @@ tab1, tab2 = st.tabs(["🧩 Option 1: Paste JSON (Manual)", "📸 Option 2: Uplo
 # ==========================================
 with tab1:
     st.subheader("Generate Excel from Structured JSON")
-    with st.expander("📌 How to use this tool (Click to view Master Prompt)"):
-        st.info(MASTER_PROMPT)
+    
+    # 🚀 NEW: Trade Secret Protected. Generic instructions added.
+    with st.expander("📌 How to use this tool manually"):
+        st.info("Go to an AI like ChatGPT or Gemini, upload your document, and ask it to extract the data using the exact JSON Schema shown below. Paste the resulting JSON here.")
+    
     with st.expander("👀 View Expected JSON Structure"):
         st.code(SAMPLE_JSON, language="json")
     st.markdown("---")
     user_json_input = st.text_area(
-        "Paste Gemini JSON Payload Here:", 
+        "Paste JSON Payload Here:", 
         height=300, 
         max_chars=100000, 
         placeholder='{\n  "recommended_filename": "Report_Name",\n  "document": {\n    "main_title": ...\n  }\n}'
@@ -83,8 +87,9 @@ with tab1:
                 log.info("User initiated Option 1: Manual JSON Extraction")
                 parsed_json = json.loads(user_json_input)
                 
-                if "document" not in parsed_json:
-                    raise ValueError("Schema Error: Missing 'document' root key.")
+                # Check for either the old single-page format or new multi-page format
+                if "document" not in parsed_json and "pages" not in parsed_json:
+                    raise ValueError("Schema Error: Missing 'document' or 'pages' root key.")
                 
                 raw_filename = parsed_json.get("recommended_filename", "Structured_Hindi_Report")
                 safe_filename = sanitize_filename(raw_filename) + ".xlsx"
@@ -97,7 +102,6 @@ with tab1:
                         json.dump(parsed_json, f)
                         
                     with st.spinner(f"Building {safe_filename}..."):
-                        # 🚀 INJECTED NEW FONT VARIABLES HERE
                         builder = ExcelBuilder(
                             json_path=temp_json_path, 
                             output_path=temp_excel_path,
@@ -127,7 +131,8 @@ with tab2:
     st.markdown("Upload a WhatsApp image or PDF (Max 5MB).")
     
     with st.container(border=True):
-        use_custom_key = st.toggle("🔑 Use your own Gemini API Key (Bypass App Rate Limits)")
+        use_custom_key = st.toggle("🔑 Use your own Gemini API Key (Bypass App Rate Limits)", value=False)
+        
         custom_api_key = None
         if use_custom_key:
             custom_api_key = st.text_input("Enter your Gemini API Key:", type="password")
@@ -137,6 +142,8 @@ with tab2:
     extract_tables_only = st.checkbox("📊 **Extract Tables Only** (Ignore paragraphs, headers, and footers)", value=False)
     
     uploaded_file = st.file_uploader("Upload Document (JPG/PNG/PDF)", type=['jpg', 'jpeg', 'png', 'pdf'])
+
+    st.caption("🔒 **Privacy & Security Notice:** This tool uses Google's Gemini AI to analyze the layout and text of your document. Your file is processed securely in temporary memory and is **instantly deleted** from our servers the moment your Excel file is generated. We do not store your documents.")
 
     st.info("ℹ️ **AI Confidence Notice:** This system uses advanced Vision AI to process complex layouts and handwriting. While highly accurate, poor image lighting or illegible handwriting may occasionally affect the output. Please perform a quick visual review of the generated Excel file.")
     
@@ -154,13 +161,19 @@ with tab2:
                     with open(temp_doc_path, "wb") as f:
                         f.write(uploaded_file.getbuffer())
                     
-                    with st.spinner("🤖 AI is analyzing the document... (This takes 5-15 seconds)"):
+                    with st.spinner("🤖 AI is analyzing the document... (This takes 30-60 seconds)"):
                         extractor = AIExtractor(api_key=custom_api_key)
-                        extracted_json = extractor.process_document(temp_doc_path, detected_mime_type, extract_tables_only)
+                        progress_bar = st.progress(0, text="Preparing pages...")
+                        def update_progress(current_page, total_pages):
+                            progress_fraction = current_page / total_pages
+                            progress_bar.progress(progress_fraction, text=f"Processing page {current_page + 1} of {total_pages}...")
+                        extracted_json = extractor.process_document(temp_doc_path, detected_mime_type, extract_tables_only, progress_callback=update_progress)
+                        # Clear the progress bar when complete
+                        progress_bar.empty()
                     
                     with st.spinner("📊 Building Smart Excel File..."):
-                        if "document" not in extracted_json:
-                            raise ValueError("AI Output Error: Missing 'document' root key.")
+                        if "pages" not in extracted_json and "document" not in extracted_json:
+                            raise ValueError("AI Output Error: Missing valid root keys.")
                         
                         raw_filename = extracted_json.get("recommended_filename", "AI_Extracted_Report")
                         safe_filename = sanitize_filename(raw_filename) + ".xlsx"
@@ -171,7 +184,6 @@ with tab2:
                         with open(temp_json_path, 'w', encoding='utf-8') as f:
                             json.dump(extracted_json, f)
                             
-                        # 🚀 INJECTED NEW FONT VARIABLES HERE
                         builder = ExcelBuilder(
                             json_path=temp_json_path, 
                             output_path=temp_excel_path, 

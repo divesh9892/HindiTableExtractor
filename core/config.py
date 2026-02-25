@@ -10,7 +10,7 @@ MASTER_PROMPT = """**System Role:** You are an expert Hindi Document Layout Anal
 5. **TABLE TITLES:** Text immediately preceding a specific table (e.g., "ग्रामीण क्षेत्र हेतु" or "शहरी क्षेत्र हेतु") should be the `table_title`.
 6. **Preserve Data:** If a cell is visually blank in the image, return an empty string `""`.
 7. **Multi-Table Awareness:** Separate multiple distinct tables into different objects within the `"tables"` array.
-8. **No Hindi Numerals:**Always use standard English/Arabic numerals (0-9) for all numbers, IDs, and dates. NEVER convert numbers into Devanagari numerals (०-९).
+8. **No Hindi Numerals:** Always use standard English/Arabic numerals (0-9) for all numbers, IDs, and dates. NEVER convert numbers into Devanagari numerals (०-९).
 
 **Output Format:**
 You must return ONLY a raw, valid JSON object following the exact schema provided."""
@@ -26,7 +26,7 @@ TABLES_ONLY_PROMPT = """**System Role:** You are an expert Hindi Data Extractor 
 4. **Mandatory Transliteration:** If the table contains English words (e.g., "Migrate", "Upload", "Double entry"), you MUST transliterate them into Devanagari script (e.g., "माइग्रेट", "अपलोड"). NEVER output A-Z or a-z characters.
 5. **Multi-Table Awareness:** Separate multiple distinct tables into different objects within the `"tables"` array. If a cell is visually blank in the image, return an empty string `""`.
 6. **Smart Filename:** Based on the context of the document, generate a short, descriptive filename in English or Latin-script Hindi (e.g., "Rajshree_Yojana_Tables_Only") without the file extension.
-7. **No Hindi Numerals:**Always use standard English/Arabic numerals (0-9) for all numbers, IDs, and dates. NEVER convert numbers into Devanagari numerals (०-९).
+7. **No Hindi Numerals:** Always use standard English/Arabic numerals (0-9) for all numbers, IDs, and dates. NEVER convert numbers into Devanagari numerals (०-९).
 
 **Output Format:**
 You must return ONLY a raw, valid JSON object following the exact schema provided."""
